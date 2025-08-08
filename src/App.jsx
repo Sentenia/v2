@@ -8,14 +8,16 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem('tellawia.wallets',JSON.stringify(wallets)) },[wallets]);
   useEffect(()=>{ (async()=>{
     const all=[]; for(const w of wallets){
-      if(w.chain==='eth'){ const {tokens}=await fetchEthBalances(w.address); tokens.forEach(t=>all.push({...t,chain:'ethereum',wallet:w.address})) }
-      else { const {tokens}=await fetchPulseBalances(w.address); tokens.forEach(t=>all.push({...t,chain:'pulsechain',wallet:w.address})) }
-    }
-    const withUsd=[]; for(const h of all){ let price=null;
-      if(h.tokenAddress && h.tokenAddress!=='pls'){ price=await fetchPriceUsd(h.chain,h.tokenAddress) }
-      else if((h.symbol||'').toUpperCase()==='PLS'){ price=price??0.005 }
-      const usd=price?Number(h.balance||0)*Number(price):0; withUsd.push({...h,priceUsd:price||0,valueUsd:usd})
-    }
+      // inside the pricing loop:
+      let price = null;
+      const tokenId = h.tokenAddress || ''; // may be 'eth-native' or 'pls-native'
+        if (tokenId === 'eth-native') {
+        price = await fetchPriceUsd('ethereum', 'eth-native');
+      } else if (tokenId === 'pls-native') {
+        price = await fetchPriceUsd('pulsechain', 'pls-native');
+      } else if (tokenId) {
+        price = await fetchPriceUsd(h.chain, tokenId);
+      }
     const map=new Map(); for(const r of withUsd){ const key=`${r.chain}:${r.tokenAddress||r.symbol}`; const prev=map.get(key)||{...r,balance:0,valueUsd:0}; prev.balance+=Number(r.balance)||0; prev.valueUsd+=Number(r.valueUsd)||0; map.set(key,prev) }
     setPortfolioRows(Array.from(map.values()).sort((a,b)=>b.valueUsd-a.valueUsd))
   })() },[wallets,showAllChains,mainChain]);
